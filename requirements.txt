@@ -1,0 +1,31 @@
+# A股量化交易系统 - 依赖
+# pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 核心依赖
+pandas>=1.5.0
+numpy>=1.21.0
+akshare>=1.10.0          # A股免费数据源
+
+# Web服务
+fastapi>=0.100.0         # Web API框架
+uvicorn>=0.20.0          # ASGI服务器
+
+# 可视化
+flask>=2.0.0             # Web仪表盘
+matplotlib>=3.5.0        # 绑图
+
+# 配置
+pyyaml>=6.0              # YAML配置文件支持
+
+# 测试
+pytest>=7.0.0            # 测试框架
+httpx>=0.24.0            # FastAPI TestClient 依赖
+
+# WebSocket
+websockets>=11.0         # WebSocket 支持
+
+# 可选依赖
+# tushare>=1.2.0         # 需要token的数据源
+# scipy>=1.7.0           # 高级统计
+# scikit-learn>=1.0.0    # 机器学习策略
+# plotly>=5.0.0          # 交互式图表

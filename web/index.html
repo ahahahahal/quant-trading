@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantX Pro - 量化交易系统</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <!-- 字体 (本地) -->
+    <link href="/web/css/vendor/fonts.css?v=2" rel="stylesheet">
+    <!-- Vue 3 (本地) -->
+    <script src="/web/js/vendor/vue.min.js?v=2"></script>
+    <!-- Element Plus (本地) -->
+    <link rel="stylesheet" href="/web/css/vendor/element-plus.min.css?v=2">
+    <link rel="stylesheet" href="/web/css/vendor/dark-vars.min.css?v=2">
+    <script src="/web/js/vendor/element-plus.min.js?v=2"></script>
+    <script src="/web/js/vendor/zh-cn.min.js?v=2"></script>
+    <!-- Element Plus Icons (本地) -->
+    <script src="/web/js/vendor/element-plus-icons.min.js?v=2"></script>
+    <!-- ECharts (本地) -->
+    <script src="/web/js/vendor/echarts.min.js?v=2"></script>
+    <!-- KLineChart (本地) -->
+    <script src="/web/js/vendor/klinecharts.min.js?v=2"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/web/css/style.css?v=3">
+</head>
+<body class="dark">
+    <div id="app">
+        <!-- ============ Login Dialog ============ -->
+        <el-dialog v-model="loginVisible" title="" width="420px" :close-on-click-modal="false"
+            :close-on-press-escape="false" :show-close="!!token" class="login-dialog"
+            :append-to-body="true">
+            <div class="login-logo">
+                <div class="logo-big">Q</div>
+                <h2>QuantX Pro</h2>
+                <p>专业量化交易系统</p>
+            </div>
+            <el-form :model="loginForm" @submit.prevent="handleLogin" label-position="top">
+                <el-form-item label="用户名">
+                    <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large"
+                        prefix-icon="User" />
+                </el-form-item>
+                <el-form-item label="密码">
+                    <el-input v-model="loginForm.password" type="password" placeholder="请输入密码"
+                        show-password size="large" prefix-icon="Lock" />
+                </el-form-item>
+                <el-form-item style="margin-top: 8px;">
+                    <el-button type="primary" @click="handleLogin" :loading="loginLoading"
+                        style="width:100%; height: 44px; font-size: 15px; font-weight: 600;">
+                        登 录
+                    </el-button>
+                </el-form-item>
+            </el-form>
+        </el-dialog>
+
+        <!-- ============ Main Layout ============ -->
+        <div class="app-container" v-show="token">
+            <!-- ---- Sidebar ---- -->
+            <aside class="sidebar">
+                <div class="sidebar-logo">
+                    <div class="logo-icon">Q</div>
+                    <span class="logo-text">QuantX Pro</span>
+                </div>
+                <el-menu :default-active="currentPage" class="sidebar-menu" background-color="transparent"
+                    text-color="#94a3b8" active-text-color="#00e676" @select="handleMenuSelect">
+                    <el-menu-item index="dashboard">
+                        <el-icon><component :is="'Odometer'" /></el-icon>
+                        <span>首页总览</span>
+                    </el-menu-item>
+                    <el-menu-item index="market">
+                        <el-icon><component :is="'TrendCharts'" /></el-icon>
+                        <span>行情中心</span>
+                    </el-menu-item>
+                    <el-menu-item index="strategy">
+                        <el-icon><component :is="'Cpu'" /></el-icon>
+                        <span>策略管理</span>
+                    </el-menu-item>
+                    <el-menu-item index="backtest">
+                        <el-icon><component :is="'DataAnalysis'" /></el-icon>
+                        <span>回测分析</span>
+                    </el-menu-item>
+                    <el-menu-item index="trading">
+                        <el-icon><component :is="'Wallet'" /></el-icon>
+                        <span>模拟交易</span>
+                    </el-menu-item>
+                    <el-menu-item index="research">
+                        <el-icon><component :is="'DataLine'" /></el-icon>
+                        <span>因子研究</span>
+                    </el-menu-item>
+                    <el-menu-item index="crypto">
+                        <el-icon><component :is="'Coin'" /></el-icon>
+                        <span>加密货币</span>
+                    </el-menu-item>
+                </el-menu>
+                <div class="sidebar-footer">
+                    <el-button v-if="token" text @click="logout" class="logout-btn">
+                        <el-icon><component :is="'SwitchButton'" /></el-icon>
+                        <span>退出登录</span>
+                    </el-button>
+                </div>
+            </aside>
+
+            <!-- ---- Main Content ---- -->
+            <main class="main-content">
+                <!-- Header -->
+                <header class="top-header">
+                    <div class="header-left">
+                        <h2 class="page-title">{{ pageTitle }}</h2>
+                    </div>
+                    <div class="header-right">
+                        <el-input v-model="searchQuery" placeholder="搜索股票代码/名称..."
+                            prefix-icon="Search" class="header-search" @keyup.enter="handleSearch"
+                            @input="handleSearchInput"
+                            clearable />
+                        <el-tag type="success" effect="dark" class="status-tag">
+                            <span class="status-dot"></span> 实时行情
+                        </el-tag>
+                        <div class="user-avatar" @click="showUserMenu = !showUserMenu">
+                            <el-icon><component :is="'User'" /></el-icon>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- ==================== DASHBOARD PAGE ==================== -->
+                <div v-if="currentPage === 'dashboard'" class="page-container fade-in">
+                    <!-- 4 Big Stat Cards -->
+                    <div class="overview-cards">
+                        <div class="overview-card" v-for="(item, idx) in dashboardStats" :key="idx">
+                            <div class="card-header">
+                                <span class="card-title">{{ item.title }}</span>
+                                <span class="card-badge" :class="item.badgeClass" v-if="item.badge">
+                                    <span class="arrow">{{ item.badgeDir }}</span> {{ item.badge }}
+                                </span>
+                            </div>
+                            <div class="card-value" :style="{ color: item.color || 'var(--text-primary)' }">
+                                {{ item.value }}
+                            </div>
+                            <div class="card-sub">{{ item.sub }}</div>
+                        </div>
+                    </div>
+
+                    <!-- 3 Index Cards -->
+                    <div class="index-cards mb-20">
+                        <div class="index-card" v-for="(idx, i) in marketOverview" :key="i">
+                            <div class="idx-header">
+                                <span class="idx-name">{{ idx.title }}</span>
+                                <span class="card-badge" :class="idx.change >= 0 ? 'up' : 'down'">
+                                    {{ idx.change >= 0 ? '+' : '' }}{{ idx.change }}%
+                                </span>
+                            </div>
+                            <div class="idx-value" :style="{ color: idx.change >= 0 ? 'var(--up)' : 'var(--down)' }">
+                                {{ idx.value }}
+                            </div>
+                            <div class="idx-change" :style="{ color: idx.change >= 0 ? 'var(--up)' : 'var(--down)' }">
+                                {{ idx.change >= 0 ? '▲' : '▼' }} {{ idx.sub }}
+                            </div>
+                            <div class="idx-mini-chart" :id="'miniChart' + i"></div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <!-- Hot Stocks -->
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">🔥 热门股票排行</span>
+                                <el-button text type="primary" size="small" @click="loadHotStocks">
+                                    <el-icon><component :is="'Refresh'" /></el-icon>
+                                </el-button>
+                            </div>
+                            <div class="panel-body" style="padding: 8px 16px;">
+                                <el-table :data="hotStocks" stripe style="width:100%" size="small"
+                                    empty-text="加载中..." :row-style="{ cursor: 'pointer' }"
+                                    @row-click="(row) => viewKline(row.symbol)">
+                                    <el-table-column type="index" width="40" label="#" align="center">
+                                        <template #default="{ $index }">
+                                            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600;"
+                                                :style="{ color: $index < 3 ? 'var(--accent-yellow)' : 'var(--text-muted)' }">
+                                                {{ $index + 1 }}
+                                            </span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="symbol" label="代码" width="90">
+                                        <template #default="{ row }">
+                                            <span class="mono" style="font-weight: 600; font-size: 12.5px;">{{ row.symbol }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="name" label="名称" width="90" />
+                                    <el-table-column prop="price" label="最新价" width="90" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono" style="font-weight: 600;">{{ formatPrice(row.price) }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="涨跌幅" width="100" align="right">
+                                        <template #default="{ row }">
+                                            <span class="change-bar" :class="row.change >= 0 ? 'text-up' : 'text-down'">
+                                                <span class="arrow">{{ row.change >= 0 ? '▲' : '▼' }}</span>
+                                                {{ row.change >= 0 ? '+' : '' }}{{ row.change }}%
+                                            </span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="" width="60" align="center">
+                                        <template #default="{ row }">
+                                            <div :style="{
+                                                width: '40px', height: '4px', borderRadius: '2px',
+                                                background: row.change >= 0
+                                                    ? 'linear-gradient(90deg, var(--up), transparent)'
+                                                    : 'linear-gradient(90deg, var(--down), transparent)'
+                                            }"></div>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                            </div>
+                        </div>
+
+                        <!-- Today's Signals -->
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📡 今日信号</span>
+                                <el-button text type="primary" size="small" @click="loadSignals">
+                                    <el-icon><component :is="'Refresh'" /></el-icon>
+                                </el-button>
+                            </div>
+                            <div class="panel-body" style="padding: 8px 16px;">
+                                <el-table :data="todaySignals" stripe style="width:100%" size="small"
+                                    empty-text="暂无信号" max-height="400">
+                                    <el-table-column prop="symbol" label="代码" width="90">
+                                        <template #default="{ row }">
+                                            <span class="mono" style="font-weight: 600;">{{ row.symbol }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="name" label="名称" width="90" />
+                                    <el-table-column prop="signal" label="信号" width="70" align="center">
+                                        <template #default="{ row }">
+                                            <el-tag :type="row.signal === 'BUY' ? 'danger' : 'success'"
+                                                size="small" effect="dark">
+                                                {{ row.signal === 'BUY' ? '买入' : '卖出' }}
+                                            </el-tag>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="price" label="价格" width="90" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono">{{ formatPrice(row.price) }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="strategy" label="策略" min-width="120" />
+                                </el-table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== MARKET PAGE (K-Line) ==================== -->
+                <div v-if="currentPage === 'market'" class="page-container fade-in">
+                    <div class="market-layout">
+                        <!-- Left: Search + Watchlist -->
+                        <div class="market-sidebar">
+                            <div class="panel">
+                                <div class="panel-header" style="padding: 12px 14px;">
+                                    <span class="panel-title" style="font-size: 13px;">
+                                        <el-icon><component :is="'Search'" /></el-icon> 搜索
+                                    </span>
+                                </div>
+                                <div class="panel-body" style="padding: 10px 14px;">
+                                    <el-select v-model="selectedStock" filterable remote reserve-keyword
+                                        placeholder="输入代码或名称" remote-method="searchStock"
+                                        :remote-loading="stockSearching" style="width: 100%"
+                                        @change="onStockChange" size="small">
+                                        <el-option v-for="s in stockSearchResults" :key="s.symbol"
+                                            :label="s.symbol + ' ' + s.name" :value="s.symbol" />
+                                    </el-select>
+                                </div>
+                            </div>
+                            <div class="panel" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                                <div class="panel-header" style="padding: 12px 14px;">
+                                    <span class="panel-title" style="font-size: 13px;">📋 自选股</span>
+                                    <el-tag effect="dark" size="small">{{ stockList.length }}</el-tag>
+                                </div>
+                                <div style="flex: 1; overflow-y: auto; padding: 4px 8px;">
+                                    <div v-for="s in stockList.slice(0, 50)" :key="s.symbol"
+                                        class="watchlist-item" :class="{ active: selectedStock === s.symbol }"
+                                        @click="onStockChange(s.symbol)">
+                                        <div>
+                                            <div class="wl-symbol">{{ s.symbol }}</div>
+                                            <div class="wl-name">{{ s.name }}</div>
+                                        </div>
+                                        <div>
+                                            <div class="wl-price" :class="(s.change || 0) >= 0 ? 'text-up' : 'text-down'">
+                                                {{ formatPrice(s.price || s.close) }}
+                                            </div>
+                                            <div class="wl-change" :class="(s.change || s.pct_change || 0) >= 0 ? 'text-up' : 'text-down'">
+                                                {{ (s.change || s.pct_change || 0) >= 0 ? '+' : '' }}{{ (s.change || s.pct_change || 0) }}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Center: KLineChart Professional Chart -->
+                        <div class="market-main">
+                            <div class="panel" style="flex-shrink: 0;">
+                                <div class="panel-header" style="padding: 10px 16px;">
+                                    <div class="panel-title" style="font-size: 15px;">
+                                        <span v-if="selectedStock" class="mono" style="font-weight: 700;">{{ selectedStock }}</span>
+                                        <span v-else style="color: var(--text-muted);">请选择股票</span>
+                                    </div>
+                                    <!-- Timeframe Tabs -->
+                                    <div class="kline-timeframe-tabs">
+                                        <span class="kline-tf-tab" :class="{ active: klinePeriod === '1m' }" @click="switchKlinePeriod('1m')">分时</span>
+                                        <span class="kline-tf-tab" :class="{ active: klinePeriod === '30m' }" @click="switchKlinePeriod('30m')">30分</span>
+                                        <span class="kline-tf-tab" :class="{ active: klinePeriod === '1d' }" @click="switchKlinePeriod('1d')">日K</span>
+                                        <span class="kline-tf-tab" :class="{ active: klinePeriod === '1w' }" @click="switchKlinePeriod('1w')">周K</span>
+                                        <span class="kline-tf-tab" :class="{ active: klinePeriod === '1M' }" @click="switchKlinePeriod('1M')">月K</span>
+                                    </div>
+                                </div>
+                                <!-- KLineChart Container -->
+                                <div style="position:relative;">
+                                    <div id="klineChartPro" class="klinechart-container"></div>
+                                    <div v-if="klineLoading" class="kline-loading-overlay">
+                                        <div class="kline-loading-spinner"></div>
+                                        <span>加载中...</span>
+                                    </div>
+                                </div>
+                                <!-- Indicator Selection Bar -->
+                                <div class="indicator-bar">
+                                    <span class="indicator-label">主图指标:</span>
+                                    <button class="indicator-btn" :class="{ active: activeMainIndicators.includes('MA') }" @click="toggleMainIndicator('MA')">MA</button>
+                                    <button class="indicator-btn" :class="{ active: activeMainIndicators.includes('BOLL') }" @click="toggleMainIndicator('BOLL')">BOLL</button>
+                                    <span class="indicator-divider"></span>
+                                    <span class="indicator-label">副图指标:</span>
+                                    <button class="indicator-btn" :class="{ active: activeSubIndicators.includes('MACD') }" @click="toggleSubIndicator('MACD')">MACD</button>
+                                    <button class="indicator-btn" :class="{ active: activeSubIndicators.includes('KDJ') }" @click="toggleSubIndicator('KDJ')">KDJ</button>
+                                    <button class="indicator-btn" :class="{ active: activeSubIndicators.includes('RSI') }" @click="toggleSubIndicator('RSI')">RSI</button>
+                                    <button class="indicator-btn" :class="{ active: activeSubIndicators.includes('VOL') }" @click="toggleSubIndicator('VOL')">VOL</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Stock Detail Panel -->
+                        <div class="stock-detail-panel">
+                            <div class="panel">
+                                <div class="panel-header" style="padding: 12px 14px;">
+                                    <span class="panel-title" style="font-size: 13px;">📊 股票详情</span>
+                                </div>
+                                <div class="stock-detail-body" v-if="stockDetail.symbol">
+                                    <div class="stock-detail-name">
+                                        <span class="sd-name">{{ stockDetail.name || stockDetail.symbol }}</span>
+                                        <span class="sd-symbol mono">{{ stockDetail.symbol }}</span>
+                                    </div>
+                                    <div class="stock-detail-price" :class="(stockDetail.change || 0) >= 0 ? 'text-up' : 'text-down'">
+                                        {{ formatPrice(stockDetail.price || stockDetail.close) }}
+                                        <span class="sd-change-badge" :class="(stockDetail.change || 0) >= 0 ? 'up' : 'down'">
+                                            {{ (stockDetail.change || 0) >= 0 ? '+' : '' }}{{ (stockDetail.change || 0).toFixed(2) }}%
+                                        </span>
+                                    </div>
+                                    <div class="stock-detail-grid">
+                                        <div class="sd-row"><span class="sd-label">涨跌额</span><span class="sd-value" :class="(stockDetail.change || 0) >= 0 ? 'text-up' : 'text-down'">{{ (stockDetail.change || 0) >= 0 ? '+' : '' }}{{ ((stockDetail.price || 0) * (stockDetail.change || 0) / 100).toFixed(2) }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">成交量</span><span class="sd-value mono">{{ stockDetail.volume ? (stockDetail.volume / 10000).toFixed(1) + '万手' : '-' }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">成交额</span><span class="sd-value mono">{{ stockDetail.amount ? (stockDetail.amount / 100000000).toFixed(2) + '亿' : '-' }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">换手率</span><span class="sd-value mono">{{ stockDetail.turnover_rate ? stockDetail.turnover_rate.toFixed(2) + '%' : '-' }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">市盈率</span><span class="sd-value mono">{{ stockDetail.pe_ratio ? stockDetail.pe_ratio.toFixed(2) : '-' }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">市净率</span><span class="sd-value mono">{{ stockDetail.pb_ratio ? stockDetail.pb_ratio.toFixed(2) : '-' }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">最高</span><span class="sd-value text-up mono">{{ formatPrice(stockDetail.high) }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">最低</span><span class="sd-value text-down mono">{{ formatPrice(stockDetail.low) }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">今开</span><span class="sd-value mono">{{ formatPrice(stockDetail.open) }}</span></div>
+                                        <div class="sd-row"><span class="sd-label">昨收</span><span class="sd-value mono">{{ formatPrice(stockDetail.prev_close) }}</span></div>
+                                    </div>
+                                </div>
+                                <div v-else style="padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 13px;">
+                                    请在左侧选择股票查看详情
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== STRATEGY PAGE ==================== -->
+                <div v-if="currentPage === 'strategy'" class="page-container fade-in">
+                    <div class="panel mb-20">
+                        <div class="panel-header">
+                            <span class="panel-title">🧠 策略库</span>
+                            <el-button type="primary" size="small" @click="loadStrategies"
+                                :loading="strategiesLoading">
+                                <el-icon><component :is="'Refresh'" /></el-icon> 刷新
+                            </el-button>
+                        </div>
+                    </div>
+                    <div class="strategy-grid">
+                        <div class="strategy-card" v-for="(s, i) in strategies" :key="s.name">
+                            <div class="strategy-icon">
+                                {{ getStrategyIcon(i) }}
+                            </div>
+                            <div class="strat-name">{{ s.name }}</div>
+                            <div class="strat-desc">{{ s.description || '暂无描述' }}</div>
+                            <div class="strat-params">
+                                <span class="strat-param-tag" v-for="(val, key) in (s.params || {})" :key="key">
+                                    {{ key }}={{ val }}
+                                </span>
+                                <span v-if="!s.params || Object.keys(s.params).length === 0"
+                                    class="strat-param-tag">默认参数</span>
+                            </div>
+                            <div class="strat-actions">
+                                <el-button type="primary" size="small" @click="quickBacktest(s)">
+                                    <el-icon><component :is="'VideoPlay'" /></el-icon> 一键回测
+                                </el-button>
+                                <el-button size="small" @click="viewStrategyDetail(s)">
+                                    <el-icon><component :is="'View'" /></el-icon> 详情
+                                </el-button>
+                            </div>
+                        </div>
+                    </div>
+                    <el-empty v-if="!strategiesLoading && strategies.length === 0" description="暂无策略" />
+                </div>
+
+                <!-- ==================== BACKTEST PAGE ==================== -->
+                <div v-if="currentPage === 'backtest'" class="page-container fade-in">
+                    <!-- Config Bar -->
+                    <div class="panel mb-16">
+                        <div class="panel-header">
+                            <span class="panel-title">⚙️ 回测配置</span>
+                        </div>
+                        <div class="panel-body">
+                            <el-form :inline="true" :model="backtestForm" size="default">
+                                <el-form-item label="股票代码">
+                                    <el-select v-model="backtestForm.symbol" filterable placeholder="选择股票"
+                                        style="width: 200px">
+                                        <el-option v-for="s in stockList" :key="s.symbol"
+                                            :label="s.symbol + ' - ' + s.name" :value="s.symbol" />
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item label="策略">
+                                    <el-select v-model="backtestForm.strategy" placeholder="选择策略"
+                                        style="width: 200px">
+                                        <el-option v-for="s in strategies" :key="s.name" :label="s.name"
+                                            :value="s.name" />
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item label="时间范围">
+                                    <el-date-picker v-model="backtestForm.dateRange" type="daterange"
+                                        range-separator="至" start-placeholder="开始" end-placeholder="结束"
+                                        value-format="YYYY-MM-DD" />
+                                </el-form-item>
+                                <el-form-item>
+                                    <el-button type="primary" @click="runBacktest" :loading="backtestLoading">
+                                        <el-icon><component :is="'VideoPlay'" /></el-icon> 运行回测
+                                    </el-button>
+                                </el-form-item>
+                            </el-form>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <template v-if="backtestResult">
+                        <!-- Performance Metric Cards -->
+                        <div class="metrics-cards">
+                            <div class="metric-card" v-for="(m, i) in backtestMetrics" :key="i">
+                                <div class="metric-label">{{ m.label }}</div>
+                                <div class="metric-value" :class="m.class">{{ m.value }}</div>
+                            </div>
+                        </div>
+                        <!-- Backtest KLine with Buy/Sell Signals -->
+                        <div class="panel mb-16">
+                            <div class="panel-header">
+                                <span class="panel-title">📈 回测K线图 + 买卖信号</span>
+                            </div>
+                            <div id="backtestKlineChart" class="klinechart-container" style="height: 500px;"></div>
+                        </div>
+
+                        <!-- Charts -->
+                        <div class="dashboard-grid mb-16">
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <span class="panel-title">📈 权益曲线</span>
+                                </div>
+                                <div id="equityChart" class="chart-container"></div>
+                            </div>
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <span class="panel-title">📉 回撤曲线</span>
+                                </div>
+                                <div id="drawdownChart" class="chart-container"></div>
+                            </div>
+                        </div>
+
+                        <!-- Trade Records -->
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📋 交易记录</span>
+                                <el-tag effect="dark">共 {{ backtestResult.trades ? backtestResult.trades.length : 0 }} 笔</el-tag>
+                            </div>
+                            <div class="panel-body" style="padding: 8px 16px;">
+                                <el-table :data="backtestResult.trades" stripe style="width:100%" size="small"
+                                    max-height="400" empty-text="无交易记录">
+                                    <el-table-column type="index" width="50" label="#" align="center" />
+                                    <el-table-column prop="date" label="日期" width="110">
+                                        <template #default="{ row }">
+                                            <span class="mono">{{ row.date }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="type" label="方向" width="70" align="center">
+                                        <template #default="{ row }">
+                                            <el-tag :type="row.type === 'BUY' ? 'danger' : 'success'"
+                                                size="small" effect="dark">
+                                                {{ row.type === 'BUY' ? '买入' : '卖出' }}
+                                            </el-tag>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="price" label="价格" width="90" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono">{{ formatPrice(row.price) }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="shares" label="数量" width="80" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono">{{ row.shares }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="amount" label="金额" width="120" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono">{{ formatMoney(row.amount) }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="profit" label="盈亏" width="110" align="right">
+                                        <template #default="{ row }">
+                                            <span v-if="row.profit !== undefined" class="mono"
+                                                :class="row.profit >= 0 ? 'text-up' : 'text-down'">
+                                                {{ row.profit >= 0 ? '+' : '' }}{{ formatMoney(row.profit) }}
+                                            </span>
+                                            <span v-else style="color: var(--text-muted);">-</span>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ==================== TRADING PAGE ==================== -->
+                <div v-if="currentPage === 'trading'" class="page-container fade-in">
+                    <!-- Control Panel -->
+                    <div class="panel mb-16">
+                        <div class="panel-header">
+                            <span class="panel-title">🎛️ 交易控制</span>
+                            <div class="flex gap-8" style="align-items: center;">
+                                <el-tag v-if="tradingStatus.status === 'running'" type="success" effect="dark" size="large">
+                                    <span class="status-dot"></span> 运行中
+                                </el-tag>
+                                <el-tag v-else type="info" effect="dark" size="large">未启动</el-tag>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <el-form :inline="true" size="default">
+                                <el-form-item label="策略">
+                                    <el-select v-model="tradingForm.strategy" placeholder="选择策略"
+                                        style="width: 200px" :disabled="tradingStatus.status === 'running'">
+                                        <el-option v-for="s in strategies" :key="s.name"
+                                            :label="s.name + ' - ' + (s.description || '')" :value="s.name" />
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item label="初始资金">
+                                    <el-input-number v-model="tradingForm.initialCapital" :min="100000"
+                                        :step="100000" :disabled="tradingStatus.status === 'running'"
+                                        style="width: 180px" />
+                                </el-form-item>
+                                <el-form-item>
+                                    <el-button v-if="tradingStatus.status !== 'running'" type="success"
+                                        @click="startTrading" :loading="tradingLoading">
+                                        <el-icon><component :is="'VideoPlay'" /></el-icon> 启动交易
+                                    </el-button>
+                                    <el-button v-else type="danger" @click="stopTrading" :loading="tradingLoading">
+                                        <el-icon><component :is="'VideoPause'" /></el-icon> 停止交易
+                                    </el-button>
+                                    <el-button @click="refreshTradingData" :loading="tradingRefreshing">
+                                        <el-icon><component :is="'Refresh'" /></el-icon> 刷新
+                                    </el-button>
+                                </el-form-item>
+                            </el-form>
+                        </div>
+                    </div>
+
+                    <!-- Account Summary -->
+                    <div class="metrics-cards mb-16">
+                        <div class="metric-card">
+                            <div class="metric-label">💰 总资产</div>
+                            <div class="metric-value neutral mono">{{ formatMoney(tradingStatus.total_equity || 0) }}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">💵 可用现金</div>
+                            <div class="metric-value neutral mono">{{ formatMoney(tradingStatus.cash || 0) }}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">📊 持仓市值</div>
+                            <div class="metric-value neutral mono">{{ formatMoney(tradingStatus.market_value || 0) }}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">📈 总收益率</div>
+                            <div class="metric-value mono"
+                                :class="(tradingStatus.total_return_pct || 0) >= 0 ? 'positive' : 'negative'">
+                                {{ (tradingStatus.total_return_pct || 0) >= 0 ? '+' : '' }}{{ (tradingStatus.total_return_pct || 0).toFixed(2) }}%
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">📋 今日盈亏</div>
+                            <div class="metric-value mono"
+                                :class="(tradingStatus.today_pnl || 0) >= 0 ? 'positive' : 'negative'">
+                                {{ (tradingStatus.today_pnl || 0) >= 0 ? '+' : '' }}{{ formatMoney(tradingStatus.today_pnl || 0) }}
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">🧾 总盈亏</div>
+                            <div class="metric-value mono"
+                                :class="(tradingStatus.total_pnl || 0) >= 0 ? 'positive' : 'negative'">
+                                {{ (tradingStatus.total_pnl || 0) >= 0 ? '+' : '' }}{{ formatMoney(tradingStatus.total_pnl || 0) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Positions & PnL -->
+                    <div class="dashboard-grid mb-16">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📦 当前持仓</span>
+                                <el-tag effect="dark">{{ tradingPositions.length }} 只</el-tag>
+                            </div>
+                            <div class="panel-body" style="padding: 8px 16px;">
+                                <el-table :data="tradingPositions" stripe style="width:100%" size="small"
+                                    empty-text="暂无持仓" max-height="350">
+                                    <el-table-column prop="symbol" label="代码" width="80">
+                                        <template #default="{ row }"><span class="mono">{{ row.symbol }}</span></template>
+                                    </el-table-column>
+                                    <el-table-column prop="name" label="名称" width="80" />
+                                    <el-table-column prop="shares" label="数量" width="70" align="right">
+                                        <template #default="{ row }"><span class="mono">{{ row.shares }}</span></template>
+                                    </el-table-column>
+                                    <el-table-column label="成本" width="80" align="right">
+                                        <template #default="{ row }"><span class="mono">{{ formatPrice(row.avg_cost) }}</span></template>
+                                    </el-table-column>
+                                    <el-table-column label="现价" width="80" align="right">
+                                        <template #default="{ row }"><span class="mono">{{ formatPrice(row.current_price) }}</span></template>
+                                    </el-table-column>
+                                    <el-table-column label="盈亏" width="100" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono" :class="row.pnl >= 0 ? 'text-up' : 'text-down'">
+                                                {{ row.pnl >= 0 ? '+' : '' }}{{ formatMoney(row.pnl) }}
+                                            </span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="盈亏率" width="80" align="right">
+                                        <template #default="{ row }">
+                                            <span class="mono" :class="row.pnl_pct >= 0 ? 'text-up' : 'text-down'">
+                                                {{ row.pnl_pct >= 0 ? '+' : '' }}{{ row.pnl_pct.toFixed(2) }}%
+                                            </span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="holding_days" label="天数" width="55" align="center" />
+                                </el-table>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📈 盈亏曲线</span>
+                            </div>
+                            <div id="pnlChart" class="chart-container" style="min-height: 350px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Trade History -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">📋 交易记录</span>
+                            <el-tag effect="dark">共 {{ tradingHistory.length }} 笔</el-tag>
+                        </div>
+                        <div class="panel-body" style="padding: 8px 16px;">
+                            <el-table :data="tradingHistory" stripe style="width:100%" size="small"
+                                empty-text="暂无交易记录" max-height="400">
+                                <el-table-column prop="date" label="时间" width="160">
+                                    <template #default="{ row }"><span class="mono" style="font-size: 12px;">{{ row.date }}</span></template>
+                                </el-table-column>
+                                <el-table-column prop="symbol" label="代码" width="80">
+                                    <template #default="{ row }"><span class="mono">{{ row.symbol }}</span></template>
+                                </el-table-column>
+                                <el-table-column prop="name" label="名称" width="80" />
+                                <el-table-column prop="direction" label="方向" width="65" align="center">
+                                    <template #default="{ row }">
+                                        <el-tag :type="row.direction === 'BUY' ? 'danger' : 'success'"
+                                            size="small" effect="dark">
+                                            {{ row.direction === 'BUY' ? '买入' : '卖出' }}
+                                        </el-tag>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="价格" width="80" align="right">
+                                    <template #default="{ row }"><span class="mono">{{ formatPrice(row.price) }}</span></template>
+                                </el-table-column>
+                                <el-table-column prop="shares" label="数量" width="70" align="right">
+                                    <template #default="{ row }"><span class="mono">{{ row.shares }}</span></template>
+                                </el-table-column>
+                                <el-table-column label="金额" width="110" align="right">
+                                    <template #default="{ row }"><span class="mono">{{ formatMoney(row.amount) }}</span></template>
+                                </el-table-column>
+                                <el-table-column label="手续费" width="80" align="right">
+                                    <template #default="{ row }"><span class="mono">{{ formatMoney((row.commission || 0) + (row.stamp_tax || 0)) }}</span></template>
+                                </el-table-column>
+                                <el-table-column label="盈亏" width="100" align="right">
+                                    <template #default="{ row }">
+                                        <span class="mono" :class="row.pnl >= 0 ? 'text-up' : 'text-down'">
+                                            {{ row.pnl >= 0 ? '+' : '' }}{{ formatMoney(row.pnl) }}
+                                        </span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column prop="reason" label="原因" min-width="120" show-overflow-tooltip />
+                            </el-table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== FACTOR RESEARCH PAGE ==================== -->
+                <div v-if="currentPage === 'research'" class="page-container fade-in">
+                    <!-- Config -->
+                    <div class="panel mb-16">
+                        <div class="panel-header">
+                            <span class="panel-title">🔬 因子研究配置</span>
+                        </div>
+                        <div class="panel-body">
+                            <el-row :gutter="16">
+                                <el-col :span="5">
+                                    <div style="margin-bottom: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 500;">股票代码</div>
+                                    <el-input v-model="researchForm.symbol" placeholder="如 600519" clearable size="default" />
+                                </el-col>
+                                <el-col :span="7">
+                                    <div style="margin-bottom: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 500;">日期范围</div>
+                                    <el-date-picker v-model="researchForm.dateRange" type="daterange"
+                                        range-separator="至" start-placeholder="开始" end-placeholder="结束"
+                                        value-format="YYYYMMDD" style="width: 100%;" />
+                                </el-col>
+                                <el-col :span="12">
+                                    <div style="margin-bottom: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 500;">选择因子（多选）</div>
+                                    <el-select v-model="researchForm.selectedFactors" multiple filterable collapse-tags
+                                        collapse-tags-tooltip placeholder="选择要分析的因子" style="width: 100%;">
+                                        <el-option v-for="f in factorList" :key="f" :label="f" :value="f" />
+                                    </el-select>
+                                </el-col>
+                            </el-row>
+                        </div>
+                    </div>
+
+                    <!-- IC + Quintile -->
+                    <div class="dashboard-grid mb-16">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📊 因子IC分析</span>
+                                <el-button type="primary" size="small" @click="runFactorIC" :loading="factorICLoading">
+                                    运行IC分析
+                                </el-button>
+                            </div>
+                            <div class="panel-body">
+                                <div v-if="factorICResult && factorICResult.factors && factorICResult.factors.length > 0">
+                                    <div id="icChart" class="chart-container" style="min-height: 350px;"></div>
+                                    <el-table :data="factorICResult.factors.map((f, i) => ({
+                                        factor: f,
+                                        ic_mean: factorICResult.ic_mean[i],
+                                        ic_std: factorICResult.ic_std[i],
+                                        icir: factorICResult.icir[i]
+                                    }))" stripe size="small" style="margin-top: 12px;">
+                                        <el-table-column prop="factor" label="因子" width="140" />
+                                        <el-table-column prop="ic_mean" label="IC均值" width="110" align="right">
+                                            <template #default="{ row }">
+                                                <span class="mono" :class="row.ic_mean >= 0 ? 'text-up' : 'text-down'">{{ row.ic_mean }}</span>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="ic_std" label="IC标准差" width="110" align="right">
+                                            <template #default="{ row }"><span class="mono">{{ row.ic_std }}</span></template>
+                                        </el-table-column>
+                                        <el-table-column prop="icir" label="ICIR" width="100" align="right">
+                                            <template #default="{ row }">
+                                                <span class="mono" style="color: #00e676; font-weight: 600;">{{ row.icir }}</span>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
+                                </div>
+                                <el-empty v-else description="点击「运行IC分析」开始" />
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📈 分层回测</span>
+                                <div class="flex gap-8" style="align-items: center;">
+                                    <el-select v-model="researchForm.quintileFactor" size="small"
+                                        style="width: 140px;" placeholder="选择因子">
+                                        <el-option v-for="f in factorList" :key="f" :label="f" :value="f" />
+                                    </el-select>
+                                    <el-button type="primary" size="small" @click="runFactorQuintile"
+                                        :loading="factorQuintileLoading">运行</el-button>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <div v-if="factorQuintileResult && factorQuintileResult.dates">
+                                    <div id="quintileChart" class="chart-container" style="min-height: 350px;"></div>
+                                    <div v-if="factorQuintileResult.group_returns" style="margin-top: 12px;">
+                                        <el-row :gutter="12">
+                                            <el-col :span="4" v-for="(val, name) in factorQuintileResult.group_returns" :key="name">
+                                                <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                                                    <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 4px;">{{ name }}</div>
+                                                    <div class="mono" :style="{ color: val >= 0 ? 'var(--up)' : 'var(--down)', fontWeight: 600, fontSize: '15px' }">
+                                                        {{ val >= 0 ? '+' : '' }}{{ val }}%
+                                                    </div>
+                                                </div>
+                                            </el-col>
+                                        </el-row>
+                                    </div>
+                                </div>
+                                <el-empty v-else description="点击「运行分层回测」开始" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Correlation & Decay -->
+                    <div class="dashboard-grid">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">🔗 因子相关性矩阵</span>
+                                <el-button type="primary" size="small" @click="runFactorCorrelation"
+                                    :loading="factorCorrLoading">计算相关性</el-button>
+                            </div>
+                            <div class="panel-body">
+                                <div v-if="factorCorrResult && factorCorrResult.factors">
+                                    <div id="corrChart" class="chart-container" style="min-height: 450px;"></div>
+                                </div>
+                                <el-empty v-else description="点击「计算相关性」开始" />
+                            </div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">📉 因子衰减分析</span>
+                                <el-button type="primary" size="small" @click="runFactorDecay"
+                                    :loading="factorDecayLoading">运行衰减分析</el-button>
+                            </div>
+                            <div class="panel-body">
+                                <div v-if="factorDecayResult && factorDecayResult.factors">
+                                    <div id="decayChart" class="chart-container" style="min-height: 350px;"></div>
+                                    <div style="margin-top: 12px; color: var(--text-muted); font-size: 12px;">
+                                        <el-icon><InfoFilled /></el-icon>
+                                        显示不同持有期（1/5/10/20天）的IC均值，IC衰减越慢说明因子预测能力越持久
+                                    </div>
+                                </div>
+                                <el-empty v-else description="点击「运行衰减分析」开始" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CRYPTO PAGE ==================== -->
+                <div v-if="currentPage === 'crypto'" class="page-container fade-in">
+                    <!-- Crypto Tickers Banner -->
+                    <div class="panel mb-16">
+                        <div class="panel-header">
+                            <span class="panel-title">🪙 加密货币实时行情</span>
+                            <el-button text type="primary" size="small" @click="loadCryptoTickers" :loading="cryptoTickersLoading">
+                                <el-icon><component :is="'Refresh'" /></el-icon> 刷新
+                            </el-button>
+                        </div>
+                        <div class="panel-body" style="padding: 12px 16px;">
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                <div v-for="t in cryptoTickers" :key="t.symbol"
+                                    style="flex: 1; min-width: 160px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;"
+                                    @click="selectCrypto(t.symbol)">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-weight: 700; font-size: 13px; color: var(--text-primary);">{{ t.symbol }}</span>
+                                        <span class="mono" :class="t.change >= 0 ? 'text-up' : 'text-down'" style="font-size: 11px;">
+                                            {{ t.change >= 0 ? '+' : '' }}{{ (t.change || 0).toFixed(2) }}%
+                                        </span>
+                                    </div>
+                                    <div class="mono" style="font-size: 16px; font-weight: 700; margin-top: 4px;"
+                                        :style="{ color: t.change >= 0 ? 'var(--up)' : 'var(--down)' }">
+                                        ${{ formatCryptoPrice(t.last) }}
+                                    </div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                                        Vol: {{ formatCryptoVol(t.volume) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 16px;">
+                        <!-- Left: Pair Selector + Signal Scanner -->
+                        <div style="width: 280px; flex-shrink: 0;">
+                            <div class="panel mb-16">
+                                <div class="panel-header" style="padding: 12px 14px;">
+                                    <span class="panel-title" style="font-size: 13px;">📋 交易对</span>
+                                </div>
+                                <div style="max-height: 300px; overflow-y: auto; padding: 4px 8px;">
+                                    <div v-for="p in cryptoPairs" :key="p.symbol"
+                                        class="watchlist-item" :class="{ active: selectedCrypto === p.symbol }"
+                                        @click="selectCrypto(p.symbol)">
+                                        <div>
+                                            <div class="wl-symbol" style="font-size: 12px;">{{ p.symbol }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Signal Scanner -->
+                            <div class="panel">
+                                <div class="panel-header" style="padding: 12px 14px;">
+                                    <span class="panel-title" style="font-size: 13px;">📡 信号扫描</span>
+                                </div>
+                                <div class="panel-body" style="padding: 12px 14px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">策略</div>
+                                        <el-select v-model="cryptoScanStrategy" size="small" style="width: 100%;">
+                                            <el-option v-for="s in strategies" :key="s.name" :label="s.name" :value="s.name" />
+                                        </el-select>
+                                    </div>
+                                    <div style="margin-bottom: 10px;">
+                                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">周期</div>
+                                        <el-select v-model="cryptoScanInterval" size="small" style="width: 100%;">
+                                            <el-option label="1小时" value="1h" />
+                                            <el-option label="4小时" value="4h" />
+                                            <el-option label="日线" value="1d" />
+                                        </el-select>
+                                    </div>
+                                    <el-button type="primary" size="small" style="width: 100%;" @click="runCryptoScan" :loading="cryptoScanLoading">
+                                        🔍 开始扫描
+                                    </el-button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Center: KLine Chart -->
+                        <div style="flex: 1;">
+                            <div class="panel mb-16">
+                                <div class="panel-header" style="padding: 10px 16px;">
+                                    <div class="panel-title" style="font-size: 15px;">
+                                        <span v-if="selectedCrypto" class="mono" style="font-weight: 700;">{{ selectedCrypto }}</span>
+                                        <span v-else style="color: var(--text-muted);">选择交易对查看K线</span>
+                                    </div>
+                                    <div class="flex gap-8" v-if="selectedCrypto">
+                                        <el-button v-for="p in ['1h','4h','1d','1w']" :key="p"
+                                            :type="cryptoKlinePeriod === p ? 'primary' : 'default'"
+                                            size="small" @click="switchCryptoPeriod(p)">
+                                            {{ p }}
+                                        </el-button>
+                                        <el-select v-model="selectedCrypto" size="small" style="width: 130px;" @change="selectCrypto">
+                                            <el-option v-for="p in cryptoPairs" :key="p.symbol" :label="p.symbol" :value="p.symbol" />
+                                        </el-select>
+                                    </div>
+                                </div>
+                                <div class="panel-body" style="padding: 0;">
+                                    <div v-if="selectedCrypto">
+                                        <div v-if="cryptoKlineLoading" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                                            加载中...
+                                        </div>
+                                        <div id="cryptoKlineChart" style="height: 500px;"></div>
+                                    </div>
+                                    <div v-else style="padding: 80px 0; text-align: center; color: var(--text-muted);">
+                                        <el-icon :size="48"><component :is="'Coin'" /></el-icon>
+                                        <p style="margin-top: 12px;">选择左侧交易对开始分析</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Ticker Detail -->
+                            <div class="panel" v-if="selectedCrypto && cryptoTickerData.symbol">
+                                <div class="panel-header" style="padding: 10px 16px;">
+                                    <span class="panel-title" style="font-size: 13px;">📊 实时详情 - {{ selectedCrypto }}</span>
+                                </div>
+                                <div class="panel-body" style="padding: 12px 16px;">
+                                    <el-row :gutter="16">
+                                        <el-col :span="4" v-for="(item, idx) in cryptoTickerCards" :key="idx">
+                                            <div style="text-align: center; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
+                                                <div style="font-size: 11px; color: var(--text-muted);">{{ item.label }}</div>
+                                                <div class="mono" style="font-size: 14px; font-weight: 600; margin-top: 4px;" :style="{ color: item.color }">
+                                                    {{ item.value }}
+                                                </div>
+                                            </div>
+                                        </el-col>
+                                    </el-row>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Scan Results -->
+                        <div style="width: 300px; flex-shrink: 0;" v-if="cryptoScanResults.length > 0">
+                            <div class="panel">
+                                <div class="panel-header" style="padding: 12px 14px;">
+                                    <span class="panel-title" style="font-size: 13px;">🎯 扫描结果</span>
+                                    <el-tag effect="dark" size="small">{{ cryptoScanResults.length }}</el-tag>
+                                </div>
+                                <div style="max-height: 500px; overflow-y: auto; padding: 4px 8px;">
+                                    <div v-for="r in cryptoScanResults" :key="r.symbol"
+                                        style="padding: 10px; margin-bottom: 6px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer;"
+                                        @click="selectCrypto(r.symbol)">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span class="mono" style="font-weight: 600; font-size: 12px;">{{ r.symbol }}</span>
+                                            <el-tag :type="r.signal === 'BUY' ? 'danger' : 'success'" size="small" effect="dark">
+                                                {{ r.signal === 'BUY' ? '买入' : '卖出' }}
+                                            </el-tag>
+                                        </div>
+                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                                            {{ r.strategy }} | {{ r.interval }}
+                                        </div>
+                                        <div v-if="r.reason" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                                            {{ r.reason }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="/web/js/api.js?v=3"></script>
+    <script src="/web/js/kline-manager.js?v=2"></script>
+    <script src="/web/js/charts.js?v=2"></script>
+    <script src="/web/js/app.js?v=4"></script>
+</body>
+</html>

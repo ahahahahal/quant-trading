@@ -1,0 +1,46 @@
+# A股量化交易系统 - 配置文件
+# 环境变量可覆盖任意配置, 格式: QUANT_<SECTION>_<KEY>
+# 例如: QUANT_INITIAL_CAPITAL=500000
+
+data:
+  source: akshare
+  cache_enabled: true
+  cache_dir: cache
+  default_freq: daily
+  adjust: qfq
+
+backtest:
+  initial_capital: 1000000
+  commission_rate: 0.0003
+  stamp_tax_rate: 0.001
+  slippage: 0.002
+  min_commission: 5.0
+  benchmark: "000300"
+  start_date: "20250101"
+  end_date: "20260526"
+
+risk:
+  max_position_pct: 0.25
+  max_total_position_pct: 0.8
+  stop_loss_pct: 0.08
+  take_profit_pct: 0.20
+  trailing_stop_pct: 0.05
+  max_drawdown_pct: 0.15
+  max_daily_loss_pct: 0.03
+  max_holding_days: 60
+
+signal:
+  min_score: 0.6
+  max_signals_per_day: 5
+  signal_weights:
+    trend: 0.3
+    momentum: 0.25
+    volume: 0.2
+    mean_reversion: 0.15
+    sentiment: 0.1
+
+trading:
+  market_open: "09:30"
+  market_close: "15:00"
+  lunch_start: "11:30"
+  lunch_end: "13:00"
